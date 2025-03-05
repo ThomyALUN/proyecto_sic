@@ -1,6 +1,13 @@
+import os
 import numpy as np
 import pandas as pd
 import random
+import matplotlib
+matplotlib.use("Agg") 
+import matplotlib.pyplot as plt
+
+if not os.path.exists("output"):
+    os.makedirs("output")
 
 # -----------------------------
 # 1. Lectura de datos desde Excel
@@ -10,7 +17,7 @@ import random
 # "Asignaturas": columnas: Id, Nombre, Area de conocimiento, Grupos
 # "Docentes": columnas: Id, Nombre, Area de conocimiento 1, Area de conocimiento 2, Area de conocimiento 3, Area de conocimiento 4, Capacidad grupo
 
-archivo_excel = "PlantillaAG_Entrada.xlsx"
+archivo_excel = "data/AsignaturasAG_EntradaSimulacion.xlsx" # Cambiar por la ruta correcta
 
 # Leer hojas
 df_areas_conocimiento = pd.read_excel(archivo_excel, sheet_name="AreasConocimiento")
@@ -194,8 +201,14 @@ def repair(chromosome):
 
 def genetic_algorithm():
     population = initialize_population()
-    best = None
+    best_solution = None
+    best_solution_fit = float('inf')
     best_fit = float('inf')
+    
+    # Listas para gráficas
+    offline_fitness_list = []
+    online_fitness_list = []
+    best_so_far_list = []
     
     for gen in range(generations):
         new_population = []
@@ -212,15 +225,49 @@ def genetic_algorithm():
                 new_population.append(child2)
         population = new_population
         
-        current_best = min(population, key=lambda ind: fitness(ind))
-        current_fit = fitness(current_best)
-        if current_fit < best_fit:
-            best_fit = current_fit
-            best = current_best
+        # Calcular fitness de cada individuo
+        fitness_values = [fitness(ind) for ind in population]
+        
+        # Offline performance (mejor de la generación)
+        current_offline = min(fitness_values)
+        # Online performance (promedio de la generación)
+        current_online = sum(fitness_values) / len(fitness_values)
+        # Actualizar best-so-far
+        if current_offline < best_fit:
+            best_fit = current_offline
+        
+        offline_fitness_list.append(current_offline)
+        online_fitness_list.append(current_online)
+        best_so_far_list.append(best_fit)
+        
+        # Actualizar best solution
+        current_best = population[fitness_values.index(current_offline)]
+        if current_offline < best_solution_fit:
+            best_solution_fit = current_offline
+            best_solution = current_best
+        
         if gen % 20 == 0:
-            print(f"Generación {gen}: Mejor fitness = {best_fit}")
+            print(f"Generación {gen}: Mejor fitness = {best_solution_fit}")
     
-    return best, best_fit
+    # Al finalizar
+    print("\nMejor solución encontrada:")
+    print(best_solution)
+    print("Fitness:", best_solution_fit)
+    
+    # Graficar al final
+    plt.figure()
+    plt.title("Rendimento del Algoritmo Genético")
+    plt.xlabel("Generación")
+    plt.ylabel("Fitness")
+    
+    plt.plot(range(generations), offline_fitness_list)
+    plt.plot(range(generations), online_fitness_list)
+    plt.plot(range(generations), best_so_far_list)
+
+    plt.legend(["Offline", "Online", "Best-so-far"])
+    plt.savefig("output/performance.png")
+    
+    return best_solution, best_solution_fit
 
 # -----------------------------
 # 5. Ejecución del Algoritmo y Salida de Resultados
