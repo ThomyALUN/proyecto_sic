@@ -13,7 +13,7 @@ def initialize_population(pop_size, M, D):
         population.append(chromosome)
     return population
 
-def fitness(individual, D, capacity, mu_elig, lambda_cap, get_eligibility_for_group):
+def fitness(individual, D, capacity, mu_elig, lambda_cap, get_eligibility_for_group, penalty_active):
     fit = 0
     # Penalización por uso de docentes externos
     external_count = sum(1 for gene in individual if gene == D)
@@ -22,26 +22,35 @@ def fitness(individual, D, capacity, mu_elig, lambda_cap, get_eligibility_for_gr
     # Contar asignaciones para cada docente interno
     assign_count = np.zeros(D, dtype=int)
     
-    # Penalización por elegibilidad
-    for idx, gene in enumerate(individual):
-        if gene < D:
-            assign_count[gene] += 1
-            eleg_vector = get_eligibility_for_group(idx)
-            if eleg_vector[gene] == 0:
-                fit += mu_elig
-    
-    # Penalización por capacidad
-    for j in range(D):
-        if assign_count[j] > capacity[j]:
-            fit += lambda_cap * (assign_count[j] - capacity[j])
+    if penalty_active:
+        # Penalización por elegibilidad
+        for idx, gene in enumerate(individual):
+            if gene < D:
+                assign_count[gene] += 1
+                eleg_vector = get_eligibility_for_group(idx)
+                if eleg_vector[gene] == 0:
+                    fit += mu_elig
+        
+        # Penalización por capacidad
+        for j in range(D):
+            if assign_count[j] > capacity[j]:
+                fit += lambda_cap * (assign_count[j] - capacity[j])
     
     return fit
+    
 
-def tournament_selection(population, tournament_size, fitness_fn):
-    tournament = random.sample(population, tournament_size)
-    # Ordenar en base al fitness (menor es mejor)
-    tournament.sort(key=lambda ind: fitness_fn(ind))
-    return tournament[0]
+def tournament_selection(population, fitness_values, tournament_size):
+    """ 
+    Elige 'tournament_size' índices de la población
+    y retorna el mejor individuo según fitness_values. 
+    """
+    # 1) Selecciona 'tournament_size' índices al azar
+    chosen_indices = random.sample(range(len(population)), tournament_size)
+    
+    # 2) De esos elegidos, ver cuál es el de mejor fitness
+    best_idx = min(chosen_indices, key=lambda i: fitness_values[i])
+    
+    return population[best_idx]
 
 def crossover(parent1, parent2, M, crossover_rate):
     if random.random() < crossover_rate:
@@ -85,17 +94,22 @@ def repair(chromosome, D, capacity, get_eligibility_for_group):
                 new_chrom[idx] = D
     return new_chrom
 
-def genetic_algorithm(pop_size,
-                      generations,
-                      tournament_size,
-                      crossover_rate,
-                      mutation_rate,
-                      D,
-                      M,
-                      capacity,
-                      mu_elig,
-                      lambda_cap,
-                      get_eligibility_for_group):
+def genetic_algorithm(
+        pop_size,
+        generations,
+        elitism_size,
+        tournament_size,
+        crossover_rate,
+        mutation_rate,
+        D,
+        M,
+        capacity,
+        mu_elig,
+        lambda_cap,
+        get_eligibility_for_group,
+        repair_active,
+        penalty_active,
+    ):
     # Inicializar población
     population = initialize_population(pop_size, M, D)
     
@@ -110,19 +124,33 @@ def genetic_algorithm(pop_size,
     
     # Definir función de fitness con los parámetros fijos
     def fitness_fn(ind):
-        return fitness(ind, D, capacity, mu_elig, lambda_cap, get_eligibility_for_group)
+        return fitness(ind, D, capacity, mu_elig, lambda_cap, get_eligibility_for_group, penalty_active)
     
     for gen in range(generations):
+        
+        fitness_values = [fitness_fn(ind) for ind in population]
+
+        pop_with_fit = list(zip(population, fitness_values))
+        pop_with_fit.sort(key=lambda x: x[1])
+
+        elites = []
+        if elitism_size > 0:
+            elites = [x[0] for x in pop_with_fit[:elitism_size]]
+
         new_population = []
+        for elite in elites:
+            new_population.append(elite)
+
         while len(new_population) < pop_size:
-            parent1 = tournament_selection(population, tournament_size, fitness_fn)
-            parent2 = tournament_selection(population, tournament_size, fitness_fn)
+            parent1 = tournament_selection(population, fitness_values, tournament_size)
+            parent2 = tournament_selection(population, fitness_values, tournament_size)
             
             child1, child2 = crossover(parent1, parent2, M, crossover_rate)
             child1 = mutate(child1, M, D, mutation_rate)
             child2 = mutate(child2, M, D, mutation_rate)
-            child1 = repair(child1, D, capacity, get_eligibility_for_group)
-            child2 = repair(child2, D, capacity, get_eligibility_for_group)
+            if repair_active:
+                child1 = repair(child1, D, capacity, get_eligibility_for_group)
+                child2 = repair(child2, D, capacity, get_eligibility_for_group)
             
             new_population.append(child1)
             if len(new_population) < pop_size:

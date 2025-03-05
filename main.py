@@ -30,11 +30,15 @@ if __name__ == "__main__":
         return eligibility[aid]
     
     # Parámetros
-    pop_size = 50
-    generations = 200
-    tournament_size = 3
+    pop_size = M * D
+    generations = 100
     random.seed(42)
     
+    elitism_size = 3
+    penalty_active = True
+    repair_active = True
+    tournament_size = 3
+
     crossover_rate = 0.8
     mutation_rate = 0.1
     
@@ -53,7 +57,10 @@ if __name__ == "__main__":
         capacity=capacity,
         mu_elig=mu_elig,
         lambda_cap=lambda_cap,
-        get_eligibility_for_group=get_eligibility_for_group
+        get_eligibility_for_group=get_eligibility_for_group,
+        elitism_size=elitism_size,
+        repair_active=repair_active,
+        penalty_active=penalty_active,
     )
     
     # Mostrar resultados finales
