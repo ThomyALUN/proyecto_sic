@@ -11,7 +11,7 @@ if __name__ == "__main__":
         os.makedirs("output")
     
     # Cargar datos
-    archivo_entrada = "data/AsignaturasAG_EntradaSimulacion.xlsx"
+    archivo_entrada = "data/PlantillaAG_Entrada"
     (asignaturas,
      docentes,
      docente_ids,
